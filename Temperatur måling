@@ -1,3 +1,5 @@
+#include <CircusESP32Lib.h> // Biblioteket til Circus of Things.
+
 const int tempPin = 2;     // Kobler temperaturen sensoren til pinne 2.
 int tempVal;               // definerer verdier. 
 float volts;    
