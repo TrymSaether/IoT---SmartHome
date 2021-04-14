@@ -15,7 +15,6 @@ CircusESP32Lib circusESP32(server,ssid,password);// Her leses nettadressen til C
 void setup() {
     Serial.begin(115200);
     circusESP32.begin();
-    Serial.begin(115200); 
 }
 
 void loop() { 
