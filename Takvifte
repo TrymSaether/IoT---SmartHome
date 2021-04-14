@@ -1,0 +1,21 @@
+#include <analogWrite.h>
+const int EN1 = 34;  // Enable1
+const int IN1 = 35 ; //INPUT 1
+const int IN2 = 32;  // INPUT 2
+
+void setup()   
+{                
+ pinMode(IN1, OUTPUT); 
+ pinMode(IN2, OUTPUT);
+ pinMode(EN1, OUTPUT);
+ 
+ Serial.begin(9600);    
+}
+
+void loop()                    
+{  
+ digitalWrite(IN1,LOW);
+ digitalWrite(IN2,HIGH);
+ analogWrite(EN1 , 50);
+
+}
