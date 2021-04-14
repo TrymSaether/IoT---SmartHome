@@ -5,8 +5,8 @@ int min_temp = 0;
 int max_raw_input = 4096;
 int min_raw_input = 0;
 
-char ssid[] = "Eirik sin iPhone"; // Navn apå nettverk.
-char password[] = "2x0865wpf3rb0"; // Passord til nettverk.
+char ssid[] = "*******"; // Navn apå nettverk.
+char password[] = "*********"; // Passord til nettverk.
 char server[] = "www.circusofthings.com"; // Her ligger serveren.
 char heater_temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
 char token[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0ODkwIn0.HRqG5DABkLgWQoQzRgj8RrnLVtWLYP3o7c-Ycpksl7o"; // Presonlig nøkkel for kontoen.
