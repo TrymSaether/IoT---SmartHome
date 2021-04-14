@@ -16,6 +16,6 @@ pinMode(light_sesor, INPUT); //setter lyssensoren som input
 
 void loop() {
 int analogvalue = map(analogRead(light_sesor),0,1023,0,255); //leser av lyssensoren
-Serial.println(analogvalue); // printer verdien av lyssensoren.
+circusESP32.write(light_sesor_key,analogvalue,token);
 delay(1000);
 }
