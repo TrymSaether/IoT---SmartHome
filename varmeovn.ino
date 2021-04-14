@@ -10,8 +10,8 @@ const int OFF = LOW;
 float room_temp = 23;
 float heater_Temperature = 22;
 
-char ssid[] = "Eirik sin iPhone"; // Navn apå nettverk.
-char password[] = "2x0865wpf3rb0"; // Passord til nettverk.
+char ssid[] = "***********"; // Navn apå nettverk.
+char password[] = "*********"; // Passord til nettverk.
 char server[] = "www.circusofthings.com"; // Her ligger serveren.
 char temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
 char heater_temperature_key[] = "32331"; // Nøkkel for signalet på CoT.
