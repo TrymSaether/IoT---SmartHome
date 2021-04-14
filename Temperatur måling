@@ -8,7 +8,7 @@ float temp;
 char ssid[] = "**********"; // Navn apå nettverk.
 char password[] = "********"; // Passord til nettverk.
 char server[] = "www.circusofthings.com"; // Her ligger serveren.
-char heater_temperature_key[] = "32331"; // Nøkkel for signalet på CoT.
+char heater_temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
 char token[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0ODkwIn0.HRqG5DABkLgWQoQzRgj8RrnLVtWLYP3o7c-Ycpksl7o"; // Presonlig nøkkel for kontoen.
 CircusESP32Lib circusESP32(server,ssid,password);// Her leses nettadressen til CoT, ssid, og passord inn.
 
