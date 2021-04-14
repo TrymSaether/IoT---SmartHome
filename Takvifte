@@ -3,19 +3,36 @@ const int EN1 = 34;  // Enable1
 const int IN1 = 35 ; //INPUT 1
 const int IN2 = 32;  // INPUT 2
 
+const int ON = 1;
+const int OFF = 0;
+const int ceiling_fan_speed = 50;
+
+char ssid[] = "*********"; // Navn apå nettverk.
+char password[] = "**********"; // Passord til nettverk.
+char server[] = "www.circusofthings.com"; // Her ligger serveren.
+char ceiling_fan_key[] = "25316"; // Nøkkel for signalet på CoT.
+char token[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0ODkwIn0.HRqG5DABkLgWQoQzRgj8RrnLVtWLYP3o7c-Ycpksl7o"; // Presonlig nøkkel for kontoen.
+CircusESP32Lib circusESP32(server,ssid,password);// Her leses nettadressen til CoT, ssid, og passord inn.
+
 void setup()   
-{                
+{              
+ circusESP32.begin();   
  pinMode(IN1, OUTPUT); 
  pinMode(IN2, OUTPUT);
  pinMode(EN1, OUTPUT);
- 
- Serial.begin(9600);    
+ Serial.begin(115200);    
 }
 
-void loop()                    
-{  
- digitalWrite(IN1,LOW);
- digitalWrite(IN2,HIGH);
- analogWrite(EN1 , 50);
-
+void loop(){
+ int ceiling_fan_state = circusESP32.read(ceiling_fan_key, token);
+ if (ceiling_fan_state = ON){
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  analogWrite(EN1, ceiling_fan_speed);
+ }
+ else{
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  analogWrite(EN1 , OFF);
+ }
 }
