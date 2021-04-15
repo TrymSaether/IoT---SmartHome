@@ -18,6 +18,7 @@ int lastButtonState2 = 0;
 int motorState2;
 unsigned long interval2 = 2000; 
 int counter = 0;
+int counter2 = 0;
 
 char ssid[] = "*********"; // Navn apå nettverk.
 char password[] = "**********"; // Passord til nettverk.
@@ -65,10 +66,11 @@ void loop(){
       analogWrite(EN1, 0);
       motorState = 0;
       counter = 1;
+      counter2 = 0;
     }
   }
    int buttonState2 = circusESP32.read(button_state2_key, token);
-  if (buttonState2 == 1) 
+  if (buttonState2 == 1 and counter2 == 0) 
   {
     if (lastButtonState2 == 0)
     {
@@ -92,6 +94,7 @@ void loop(){
       analogWrite(EN1 , 0);
       ledState2 = 0;
       counter = 0;
+      counter2 = 1;
     }
   } 
 
