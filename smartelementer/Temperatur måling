@@ -8,7 +8,7 @@ float temp;
 char ssid[] = "**********"; // Navn apå nettverk.
 char password[] = "********"; // Passord til nettverk.
 char server[] = "www.circusofthings.com"; // Her ligger serveren.
-char heater_temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
+char temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
 char token[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0ODkwIn0.HRqG5DABkLgWQoQzRgj8RrnLVtWLYP3o7c-Ycpksl7o"; // Presonlig nøkkel for kontoen.
 CircusESP32Lib circusESP32(server,ssid,password);// Her leses nettadressen til CoT, ssid, og passord inn.
 
@@ -25,6 +25,6 @@ void loop()
  temp = (volts - 0.5) * 100 ;         //Regner ut temperaturen i celsius ut fra likningen som står i data-sheetet til TMP36gz.
 Serial.print(temp);                  // Skriver ut verdiene.
 Serial.println (" degrees C");      
-circusESP32.write(heater_temperature_key,temp,token);
+circusESP32.write(temperature_key, temp, temp,token);
 delay(1000);                         // 1000 milli-sekund mellom hver måling. 
 }
