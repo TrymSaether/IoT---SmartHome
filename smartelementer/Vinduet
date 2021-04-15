@@ -1,0 +1,98 @@
+#include <analogWrite.h>
+const int EN1 = 34;  // Enable1
+const int IN1 = 35 ; //INPUT 1
+const int IN2 = 32;  // INPUT 2
+const int ON = 1;
+const int OFF = 0;
+const int ceiling_fan_speed = 50;
+
+unsigned long startTime;       
+const int DisplayButton = 12; 
+int lastButtonState = 0; 
+int motorState;
+unsigned long interval = 2000;  
+
+unsigned long startTime2;       
+const int DisplayButton2 = 4; 
+int lastButtonState2 = 0; 
+int motorState2;
+unsigned long interval2 = 2000; 
+int counter = 0;
+
+char ssid[] = "*********"; // Navn apå nettverk.
+char password[] = "**********"; // Passord til nettverk.
+char server[] = "www.circusofthings.com"; // Her ligger serveren.
+char button_state1_key[] = "25316"; // Nøkkel for signalet på CoT.
+char button_state2_key[] = "*****";
+char token[] = "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0ODkwIn0.HRqG5DABkLgWQoQzRgj8RrnLVtWLYP3o7c-Ycpksl7o"; // Presonlig nøkkel for kontoen.
+CircusESP32Lib circusESP32(server,ssid,password);// Her leses nettadressen til CoT, ssid, og passord inn.
+
+void setup()   
+{              
+ circusESP32.begin();   
+ pinMode(IN1, OUTPUT); 
+ pinMode(IN2, OUTPUT);
+ pinMode(EN1, OUTPUT);
+ pinMode(DisplayButton, INPUT);
+ pinMode(DisplayButton2, INPUT);
+ Serial.begin(115200);    
+}
+
+void loop(){
+ int buttonState = circusESP32.read(button_state1_key, token);
+ 
+  if (buttonState == 1 and counter == 0) 
+  {
+    if (lastButtonState == 0)
+    {
+      motorState = 1;
+      startTime = millis();
+    }
+  }
+  lastButtonState = buttonState;
+  if (motorState)
+  {
+    if (millis() - startTime <= interval)
+    {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, HIGH);
+      analogWrite(EN1, 30);
+    }
+    else
+    {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, LOW);
+      analogWrite(EN1, 0);
+      motorState = 0;
+      counter = 1;
+    }
+  }
+   int buttonState2 = circusESP32.read(button_state2_key, token);
+  if (buttonState2 == 1) 
+  {
+    if (lastButtonState2 == 0)
+    {
+      motorState2 = 1;
+      startTime2 = millis();
+    }
+  }
+  lastButtonState2 = buttonState2;
+  if (motorState2)
+  {
+    if (millis() - startTime2 <= interval2)
+    {
+      digitalWrite(IN1, HIGH);
+      digitalWrite(IN2, LOW);
+      analogWrite(EN1 , 30);
+    }
+    else
+    {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, LOW);
+      analogWrite(EN1 , 0);
+      ledState2 = 0;
+      counter = 0;
+    }
+  } 
+
+}
