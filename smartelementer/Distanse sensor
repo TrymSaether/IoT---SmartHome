@@ -1,0 +1,41 @@
+
+int trigPin = 9;    // Trigger
+int echoPin = 10;    // Echo
+int led = 7;         
+long duration, cm, inches;
+ 
+void setup() {
+  Serial.begin (9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(led,OUTPUT);
+}
+ 
+void loop() {
+// Sensoren utløses av en HØY puls på 10 eller flere mikrosekunder.
+   // Jeg gir en kort LAV puls på forhånd for å sikre en ren HØY puls:
+   // Sensoren slår seg på kun når:
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+ 
+
+  pinMode(echoPin, INPUT); // Leser signalet fra sensoren
+  duration = pulseIn(echoPin, HIGH);
+ 
+  // Convert the time into a distance
+  cm = (duration/2) / 29.1;     // Regner ut distansen...
+  Serial.print(cm);
+  Serial.print("cm");           // Skriver ut
+  Serial.println();
+  
+  delay(50);
+  if (cm < 100){
+    digitalWrite(led,HIGH);  // slår på led hvis distansen er mindre enn 100 cm.
+  }
+  else{
+    digitalWrite(led,LOW);
+  }
+}
