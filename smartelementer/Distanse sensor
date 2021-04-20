@@ -22,8 +22,7 @@ void loop() {
   digitalWrite(trigPin, LOW);
  
 
-  pinMode(echoPin, INPUT); // Leser signalet fra sensoren
-  duration = pulseIn(echoPin, HIGH);
+  duration = pulseIn(echoPin, HIGH); // Leser signalet fra sensoren
  
   // konverterer tid til distanse.
   cm = (duration/2) / 29.1;     // Regner ut distansen...
