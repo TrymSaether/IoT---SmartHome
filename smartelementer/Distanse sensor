@@ -25,7 +25,7 @@ void loop() {
   pinMode(echoPin, INPUT); // Leser signalet fra sensoren
   duration = pulseIn(echoPin, HIGH);
  
-  // Convert the time into a distance
+  // konverterer tid til distanse.
   cm = (duration/2) / 29.1;     // Regner ut distansen...
   Serial.print(cm);
   Serial.print("cm");           // Skriver ut
