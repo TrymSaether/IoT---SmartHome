@@ -5,8 +5,8 @@
 #define DHTTYPE DHT11   
 DHT dht(DHTPIN, DHTTYPE);
 
-char ssid[] = "Eirik sin iPhone"; // Navn apå nettverk.
-char password[] = "1234567890"; // Passord til nettverk.
+char ssid[] = "*************"; // Navn apå nettverk.
+char password[] = "***********"; // Passord til nettverk.
 char server[] = "www.circusofthings.com"; // Her ligger serveren.
 char Temperature_key[] = "25316"; // Nøkkel for signalet på CoT.
 char Humidity_key[] = "7876"; // Nøkkel for signalet på CoT.
