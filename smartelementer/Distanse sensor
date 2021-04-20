@@ -1,7 +1,6 @@
-
-int trigPin = 9;    // Trigger
-int echoPin = 10;    // Echo
-int led = 7;         
+int trigPin = 27;    // Trigger
+int echoPin = 26;    // Echo
+int led = 4;         
 long duration, cm, inches;
  
 void setup() {
@@ -30,9 +29,11 @@ void loop() {
   Serial.print("cm");           // Skriver ut
   Serial.println();
   
-  delay(50);
-  if (cm < 100){
+  delay(45);
+
+  if (cm < 124 and cm > 0.00001){
     digitalWrite(led,HIGH);  // slår på led hvis distansen er mindre enn 100 cm.
+    delay(10000); // delay på hvor lang tid lyset skal være på.
   }
   else{
     digitalWrite(led,LOW);
