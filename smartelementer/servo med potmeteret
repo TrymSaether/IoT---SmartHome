@@ -1,0 +1,26 @@
+
+#include <Servo.h>
+
+int pot = A0;
+int potvalue;
+int newpotvalue;
+
+
+Servo servo;
+
+void setup()
+{
+   pinMode(pot, INPUT);
+  servo.attach(9, 500, 2500);
+}
+
+void loop()
+{
+  potvalue = analogRead(pot);
+  newpotvalue = map(potvalue,0,1023,0,180);
+  Serial.println(newpotvalue);
+      servo.write(newpotvalue);
+      delay(15);
+  
+}
+
