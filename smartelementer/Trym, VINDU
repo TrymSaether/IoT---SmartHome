@@ -1,0 +1,57 @@
+
+const int EN1 = 6;  
+const int IN1 = 5; 
+const int IN2 = 3;
+unsigned long startTime;       
+const int DisplayButton = 8; 
+int lastButtonState = 0; 
+int ledState;
+unsigned long interval = 500;  
+bool state = true;
+bool state2 = false;
+
+
+
+void setup() 
+{
+  
+ pinMode(IN1, OUTPUT); 
+ pinMode(IN2, OUTPUT);
+ pinMode(EN1, OUTPUT);
+ pinMode(DisplayButton, INPUT);
+ Serial.begin(115200);
+}
+
+void loop()
+{ 
+  int buttonState = digitalRead(DisplayButton);
+  if (buttonState == 1) 
+  {
+    if (lastButtonState == 0)
+    {
+      ledState = 1;
+      startTime = millis();
+    }
+  }
+  lastButtonState = buttonState;
+  if (ledState)
+  {
+    if (millis() - startTime <= interval)
+    {
+      digitalWrite(IN1, state);
+      digitalWrite(IN2, state2);
+      analogWrite(EN1, 30);
+    }
+    else
+    {
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, LOW);
+      analogWrite(EN1, 0);
+      ledState = 0;
+      state = !state;
+      state2 = !state2;
+
+    }
+  }
+
+}
