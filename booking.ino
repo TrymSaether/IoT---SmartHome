@@ -14,7 +14,7 @@ bool my_booking1 = false;
 bool my_booking2 = false;
 bool my_booking3 = false;
 bool already_booked = false;
-
+const int booking_time = 1200000; // 20 min 
 char msgtext[25];
 char msgtext1[25];
 bool booked_status1 = false;
@@ -158,7 +158,7 @@ void change(){
   }
 }
 void reset_status(){
-  if ((my_booking1 == true) && (booking_one + 10000 <= Time)){
+  if ((my_booking1 == true) && (booking_one + booking_time <= Time)){
     sprintf(msgtext1,"available");
     sprintf(msgtext,"Available");
     client.publish("Booking1", msgtext);
@@ -166,7 +166,7 @@ void reset_status(){
     my_booking1 = false;
     already_booked = false;
   }
-  else if ((my_booking2 == true) && (booking_two + 10000 <= Time)){
+  else if ((my_booking2 == true) && (booking_two + booking_time <= Time)){
     sprintf(msgtext1,"available");
     sprintf(msgtext,"Available");
     client.publish("Booking2", msgtext);
@@ -174,7 +174,7 @@ void reset_status(){
     my_booking2 = false;
     already_booked = false;
     }
-  else if ((my_booking3 == true) && (booking_three + 10000 <= Time)){
+  else if ((my_booking3 == true) && (booking_three + booking_time <= Time)){
     sprintf(msgtext1,"available");
     sprintf(msgtext,"Available");
     client.publish("Booking3", msgtext);
