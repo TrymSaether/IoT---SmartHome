@@ -1,0 +1,94 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Wire.h>
+#include <analogWrite.h>
+
+const char* ssid = "AirLink1ACCC1";
+const char* password = "29JMaED4";
+const char* mqtt_server = "192.168.38.140";
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+const int light_sesor = 34;
+const int led = 21;
+
+void setup() {
+  Serial.begin(115200);
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+  pinMode(light_sensor, INPUT);
+  pinMode(led, OUTPUT);
+  setup_wifi();
+}
+
+void setup_wifi() {
+  delay(10);
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+
+void callback(char* topic, byte* message, unsigned int length) {
+  Serial.print("Message arrived on topic: ");
+  Serial.print(topic);
+  Serial.print(". Message: ");
+  String Payload;
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)message[i]);
+    Payload += (char)message[i];
+  }
+  Serial.println();
+
+}
+
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect("ESP8266Client")) {
+      Serial.println("connected");
+      
+      // Subscribe
+      client.subscribe("writelys");
+
+    } 
+    
+    else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();    
+long currentMillis = millis();
+long resetMillis = 0;  
+if (currentMillis - resetMillis > 5000 ){
+const char analogvalue = map(analogRead(light_sesor),0,1023,0,255); //leser av lyssensoren
+char lightvalue[8];
+dtostrf(analogvalue, 1, 2, lightvalue);
+client.publish("LysSensor", lightvalue);
+resetMillis = currentMillis;
+}
+brightness = (255 - analogvalue ); // maks lystyrke når det er lav verdi på sensoren koblet opp mot CoT 
+analogWrite(led, brightness);
+
+}
