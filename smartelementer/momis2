@@ -3,9 +3,9 @@
 #include <Wire.h>
 #include <analogWrite.h>
 
-const char* ssid = "AirLink1ACCC1";
-const char* password = "29JMaED4";
-const char* mqtt_server = "192.168.38.140";
+const char* ssid = "mohammad sin iPhone";
+const char* password = "Momis123";
+const char* mqtt_server = "10.24.144.39";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -48,9 +48,9 @@ void callback(char* topic, byte* message, unsigned int length) {
     Payload += (char)message[i];
   }
   Serial.println();
-    if (String(topic) == "writelys") {
-    Serial.println((Payload[0]+Payload[1]+Payload[2]));
-    int brightness = (255 - Payload); // maks lystyrke når det er lav verdi på sensoren koblet opp mot CoT 
+    if (String(topic) == "LysSensor") {
+    //Serial.println((Payload[0]+Payload[1]+Payload[2]));
+    int brightness = (255 - Payload.toInt()); // maks lystyrke når det er lav verdi på sensoren koblet opp mot CoT 
     analogWrite(led, brightness);
     }
   
@@ -66,7 +66,7 @@ void reconnect() {
       Serial.println("connected");
       
       // Subscribe
-      client.subscribe("writelys");
+      client.subscribe("LysSensor");
 
     } 
     
