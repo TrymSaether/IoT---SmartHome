@@ -119,7 +119,7 @@ void loop()
     // * Booker toalett i xSekund med knapp.
     if(buttonState == true)
     {
-      client.publish("homeHub/booking/bathroom", "booked"); //homeHub/booking/bathroom er nøkkelen for booking bad og booked siar at det er opptattpå badet.
+      client.publish("homeHub/booking/bathroom", "booked"); //homeHub/booking/bathroom er token for booking bad og booked siar at det er opptattpå badet.
       client.publish("homeHub/booking/ID", ID); // Sender ID på hvem som booker
       Serial.println("Bathroom is booked by: ");
       Serial.print(ID);
