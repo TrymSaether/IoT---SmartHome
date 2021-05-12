@@ -1,0 +1,387 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+int dataPin = 27;
+int clockPin = 14;
+int up = 35;
+int down = 34;
+int confirm = 32;
+int doorbell = 13;
+int greenLED = 26;
+int yellowLED = 25;
+int redLED = 33;
+int sensorPin = 4;
+
+//Variabler for ringeklokka, inkluderer valg av rom og alle timere på gjestene.
+bool choosingRoom = false;
+int roomNumber = 1;
+int timeLimit = 1800;
+const int roomTotal = 6;
+const int guestTimer = 3;
+int roomGuestTimer[roomTotal][guestTimer] = {{0, 0, 0},
+                                             {0, 0, 0},
+                                             {0, 0, 0},
+                                             {0, 0, 0},
+                                             {0, 0, 0},
+                                             {0, 0, 0},
+                                            };
+int residents = 0;
+int guests = 0;
+bool guestWait = false;
+bool roomChosen = false;
+bool guestAccept = false;
+int roomRung = 0;
+int roomAccept = 0;
+
+unsigned long currentMillis = millis();
+
+//Bytes for å vise siffer på 7-segment display. showNum[0] viser 0 på displayet.
+byte showNum[] = {B00000011, B10011111, B00100101, B00001101, B10011001, B01001001, B01000001, B00011111, B00000001, B00001001, B11111111};
+
+//Variabler for inntasting av PIN-kode.
+int PIN[] = {1, 2, 3, 4};
+int inputPIN[4];
+int PINposition = 0;
+int currentDigit = 0;
+bool pinEntered = false;
+
+//Knappetilstander for å lettere lese av knappetrykk
+bool upButtonPrev = LOW;
+bool downButtonPrev = LOW;
+bool confirmButtonPrev = LOW;
+bool doorbellButtonPrev = LOW;
+
+//WiFi
+const char *ssid = "Hybler_2.4GHz"; //Nettverk
+const char *password = "Tors Veg 2";  //Passord
+const char *mqtt_server = "192.168.1.203"; //MQTT server
+
+WiFiClient espClient; //ESP32 WiFioppkobling
+PubSubClient client(espClient); //Klient for overføring av MQTT signaler mellom ESP32 og RPi
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(dataPin, OUTPUT);
+  pinMode(clockPin, OUTPUT);
+  pinMode(up, INPUT);
+  pinMode(down, INPUT);
+  pinMode(confirm, INPUT);
+  pinMode(doorbell, INPUT);
+  pinMode(greenLED, OUTPUT);
+  pinMode(yellowLED, OUTPUT);
+  pinMode(redLED, OUTPUT);
+  pinMode(sensorPin, INPUT);
+  
+  WiFi.begin(ssid, password);           // WiFi tilkobling.
+  while (WiFi.status() != WL_CONNECTED) { // Wifi statussjekk/feilmeldinger
+    delay(500);
+    Serial.print(".");
+  }
+  
+  Serial.println("WiFi connected.");
+  Serial.println(WiFi.localIP());
+  client.setServer(mqtt_server, 1883); // MQTT broker'
+  client.setCallback(callback);
+}
+
+void callback(char *topic, byte *payload, unsigned int length) {
+  for (int i = 0; i < length; i++)
+  {
+    roomAccept += payload[i] - '0';
+  }
+}
+
+//Funksjon som leser av opp-knappen. Tar 2 argumenter: en variabel og en grense. Adderer variabelen med 1 når knappen trykkes, variabelen beholder verdien dersom den er på grensen.
+int upButton(int originalVar, int upperLimit) {
+  int var = originalVar;
+  bool upRead = digitalRead(up);
+  if (upRead == HIGH && upButtonPrev == LOW) {
+    var = originalVar + 1;
+    if (var > upperLimit) {
+      var = originalVar;
+    }
+  }
+  upButtonPrev = digitalRead(up);
+  return var;
+}
+
+//Funksjon som leser av ned-knappen. Subtraherer variabelen med 1 når knappen trykkes, variabelen beholder verdien dersom den er på grensen.
+int downButton(int originalVar, int lowerLimit) {
+  int var = originalVar;
+  bool downRead = digitalRead(down);
+  if (downRead == HIGH && downButtonPrev == LOW) {
+    var = originalVar - 1;
+    if (var < lowerLimit) {
+      var = originalVar;
+    }
+  }
+  downButtonPrev = digitalRead(down);
+  return var;
+}
+
+//Denne funksjonen kjøres konstant. Startsifferet er 0 og må økes eller minkes med opp og ned knappene. Når man skal låse inn et siffer må confirm knappen trykkes.
+//PIN-koden er 1234, og da må man velge 1 også trykke confirm. Etter hver confirm resettes verdien til 0.
+void enterPIN() {
+  showDigit(currentDigit);
+  currentDigit = upButton(currentDigit, 9);
+  currentDigit = downButton(currentDigit, 0);
+  bool confirmRead = digitalRead(confirm);
+  if (confirmRead == HIGH && confirmButtonPrev == LOW) {
+    inputPIN[PINposition] = currentDigit;
+    PINposition++;
+    digitalWrite(yellowLED, HIGH);
+    delay(250);
+    digitalWrite(yellowLED, LOW);
+    currentDigit = 0;
+  }
+  if (PINposition > 3) {
+    comparePIN();
+  }
+  confirmButtonPrev = digitalRead(confirm);
+}
+
+//Funksjonen kjøres etter at fjerde siffer i koden velges. Her sammenlignes PIN-koden med brukeres input PIN. Riktig PIN: døra åpnes for 5 sekunder. Feil PIN: rød led lyser for 1 sekund.
+void comparePIN() {
+  bool correctPIN = false;
+  for (int i = 0; i < 4; i++) {
+    if (inputPIN[i] != PIN[i]) {
+      correctPIN = false;
+    } 
+    else {
+      correctPIN = true;
+    }
+  }
+  if (correctPIN == true) {
+    pinEntered = true;
+    openDoor();
+  }
+  else if (correctPIN == false) {
+    digitalWrite(redLED, HIGH);
+    delay(1000);
+    reset();
+  }
+}
+
+void openDoor() {
+  int doorMillis = millis();
+  while (millis() - doorMillis <= 5000) { 
+    digitalWrite(greenLED, HIGH);
+    int doorOpen = digitalRead(sensorPin);
+    if (doorOpen && pinEntered) {
+      residents += 1;
+      residentCount();
+    }
+    else if (doorOpen && guestAccept) {
+      guestCount();
+    }
+  }
+  reset();
+} 
+
+//Funksjon som displayer en verdi på to 7-segmentsdisplay.
+void showDigit(int digit) {
+  shiftOut(dataPin, clockPin, LSBFIRST, showNum[10]);
+  shiftOut(dataPin, clockPin, LSBFIRST, showNum[digit]);
+}
+
+//Leser av ringeklokka, hvis knappen holdes inne for mer enn 3 sekunder må gjesten velge romnummeret de skal besøke. Ved knappetrykk sendes det et signal til alle rommene.
+void doorbellRead() {
+  int keyMillis = millis();
+  int doorbellState = digitalRead(doorbell);
+  while (doorbellState == HIGH && doorbellButtonPrev == LOW) {
+    doorbellState = digitalRead(doorbell);
+    if (doorbellState == HIGH && millis() - keyMillis >= 3000) {
+      choosingRoom = true;
+      chooseRoom();
+      break;
+    }
+    else if (doorbellState == LOW && doorbellButtonPrev == LOW) {
+      ringAll();
+      break;
+    }
+  }
+  doorbellButtonPrev = digitalRead(doorbell);
+}
+
+void ringAll() {
+  client.publish("doorHub/RingAll", "true");
+  delay(1000);
+  client.publish("doorHub/RingAll", "false");
+  guestWait = true;
+  reset();
+}
+
+void chooseRoom() {
+  while (choosingRoom) {
+    digitalWrite(yellowLED, HIGH);
+    showDigit(roomNumber);
+    roomNumber = upButton(roomNumber, 6);
+    roomNumber = downButton(roomNumber, 1);
+    int confirmRead = digitalRead(confirm);
+    if (confirmRead == HIGH && confirmButtonPrev == LOW) {
+      roomRung = roomNumber;
+      client.publish("doorHub/RingRoom", String(roomRung).c_str(), true);
+      int roomIndex = roomNumber - 1;
+      if (roomGuestTimer[roomIndex][0] == 2) {
+        digitalWrite(yellowLED, LOW);
+        choosingRoom = false;
+        roomChosen = true;
+        startTimer(roomIndex);
+      }
+      else {
+        digitalWrite(yellowLED, LOW);
+        choosingRoom = false;
+        roomChosen = true;
+        guestWait = true;
+      }
+    }
+    confirmButtonPrev = digitalRead(confirm);
+    delay(1);
+  }
+  reset();
+}
+
+//Starter en timer på gjestene som ringer på dersom antallet gjester for rommet er under 2. 
+//Er det 2 gjester hos et rom, vises antallet minutter den tidligste ankomne gjesten har igjen av grensa på 30 min.
+void startTimer(int roomAnswer) {
+  guestWait = false;
+  if (roomGuestTimer[roomAnswer][0] < 2) {
+    roomGuestTimer[roomAnswer][0] += 1;
+    int guestNum = roomGuestTimer[roomAnswer][0];
+    roomGuestTimer[roomAnswer][guestNum] = millis();
+    guestAccept = true;
+    client.publish("doorHub/RingRoom", "0");
+    openDoor();
+  }
+  else if (roomGuestTimer[roomAnswer][0] == 2) {
+    int currentMillis = millis();
+    client.publish("doorHub/RingRoom", "0");
+    while (millis() - currentMillis <= 5000) {
+      int timePassed = millis() - min(roomGuestTimer[roomAnswer][1], roomGuestTimer[roomAnswer][2]);
+      showTime(countdown(millisToSeconds(timePassed)));
+      digitalWrite(redLED, HIGH);
+      delay(1);
+    }
+  }
+  reset();
+}
+
+//Millisekunder til sekunder
+int millisToSeconds(int currentMillis) {
+  int seconds = currentMillis / 1000;
+  return seconds;
+}
+
+//Sekunder til minutter og sekunder
+int countdown(int seconds) {
+  int secondsLeft = timeLimit - seconds;
+  int minutesLeft = secondsLeft / 60;
+  if (minutesLeft > 0) {
+    return minutesLeft;
+  }
+  else {
+    return secondsLeft;
+  }
+}
+
+//Viser tiden fra countdown() på 7 segmentdisplay.
+void showTime(int time) {
+  int ones = time % 10;
+  int tens = time / 10;
+  shiftOut(dataPin, clockPin, LSBFIRST, showNum[tens]);
+  shiftOut(dataPin, clockPin, LSBFIRST, showNum[ones]);
+}
+
+//Funksjonen sjekker timer til alle gjestene, og resetter alle som har gått over 30 minutter til 0.
+void checkTimer() {
+  for (int i = 0; i < roomTotal; i++) {
+    for (int j = 1; j < guestTimer; j++) {
+      int timePassed = millis() - roomGuestTimer[i][j];
+      int secondsPassed = millisToSeconds(timePassed);
+      if (secondsPassed >= timeLimit && roomGuestTimer[i][j] != 0) {
+        roomGuestTimer[i][0] -= 1;
+        roomGuestTimer[i][j] = 0;
+        Serial.println("guest cleared");
+        break;
+      }
+    }
+  }
+}
+
+void reset() {
+  PINposition = 0; 
+  memset(inputPIN, 0, sizeof(inputPIN));
+  currentDigit = 0;
+  digitalWrite(greenLED, LOW);
+  digitalWrite(yellowLED, LOW);
+  digitalWrite(redLED, LOW);
+  roomNumber = 1;
+  pinEntered = false;
+  roomChosen = false;
+  guestAccept = false;
+  loop();
+}
+
+void guestCount() {
+  guests = roomGuestTimer[0][0] + roomGuestTimer[1][0] + roomGuestTimer[2][0] + roomGuestTimer[3][0] + roomGuestTimer[4][0] + roomGuestTimer[5][0];
+  client.publish("doorHub/GuestCount", String(guests).c_str(), true);
+  reset();
+}
+
+void residentCount() {
+  client.publish("doorHub/ResidentCount", String(residents).c_str(), true);
+  reset();
+}
+
+void guestWaiting() {
+  while (guestWait) {
+    digitalWrite(yellowLED, HIGH);
+    client.loop();
+    if (roomAccept > 0) {
+      digitalWrite(yellowLED, LOW);
+      roomAccept -= 1;
+      roomRung = 0;
+      if (roomChosen == true && roomAccept == roomRung) {
+        startTimer(roomAccept);
+      }
+      else if (roomChosen == false) {
+        startTimer(roomAccept);
+      }
+    }
+    else if (roomAccept = 0) {
+      continue;
+    }
+  }
+}
+
+void reconnect() {
+  // Loop until we're reconnected
+  Serial.println("In reconnect...");
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Attempt to connect
+    if (client.connect("doorHub")) {
+      Serial.println("connected");
+      client.subscribe("doorHub/RoomAccept");
+    }
+    else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect(); // Prøver på nytt.
+  }
+  currentMillis = millis();
+  enterPIN();
+  doorbellRead();
+  checkTimer();
+  guestWaiting();
+  client.loop();
+  delay(1);
+}
