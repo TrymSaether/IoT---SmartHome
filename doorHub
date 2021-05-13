@@ -72,18 +72,19 @@ void setup() {
   pinMode(redLED, OUTPUT);
   pinMode(sensorPin, INPUT);
   
-  WiFi.begin(ssid, password);           // WiFi tilkobling.
-  while (WiFi.status() != WL_CONNECTED) { // Wifi statussjekk/feilmeldinger
+  WiFi.begin(ssid, password);           // WiFitilkobling.
+  while (WiFi.status() != WL_CONNECTED) { // Wifistatussjekk/feilmeldinger
     delay(500);
     Serial.print(".");
   }
   
   Serial.println("WiFi connected.");
   Serial.println(WiFi.localIP());
-  client.setServer(mqtt_server, 1883); // MQTT broker'
-  client.setCallback(callback);
+  client.setServer(mqtt_server, 1883); //MQTT broker
+  client.setCallback(callback); //Setter callbackFunksjonen som klientens callback.
 }
 
+//Selve data som hentes inn fra NR.
 void callback(char *topic, byte *payload, unsigned int length) {
   for (int i = 0; i < length; i++)
   {
@@ -162,6 +163,7 @@ void comparePIN() {
   }
 }
 
+//Låser opp døra, og sjekker om døra har blitt åpnet, før en beboer eller en gjest registreres i NR.
 void openDoor() {
   int doorMillis = millis();
   while (millis() - doorMillis <= 5000) { 
@@ -203,6 +205,7 @@ void doorbellRead() {
   doorbellButtonPrev = digitalRead(doorbell);
 }
 
+//Funksjon som tilkalles etter at ringeklokka har blitt inntrykt, endrer på Ringing all på Node Red fra false til true, også tilbake til false.
 void ringAll() {
   client.publish("doorHub/RingAll", "true");
   delay(1000);
@@ -211,6 +214,7 @@ void ringAll() {
   reset();
 }
 
+//Funksjon som tilkalles etter at ringeklokka har blitt holdt inne i mer enn 3 sekunder, her kan gjesten velge rommet de skal ringe på.
 void chooseRoom() {
   while (choosingRoom) {
     digitalWrite(yellowLED, HIGH);
@@ -308,6 +312,7 @@ void checkTimer() {
   }
 }
 
+//Resetter relevante verdier som brukes til kodelås og ringeklokke.
 void reset() {
   PINposition = 0; 
   memset(inputPIN, 0, sizeof(inputPIN));
@@ -322,17 +327,20 @@ void reset() {
   loop();
 }
 
+//Skriver antallet gjester i Node Red dashboard
 void guestCount() {
   guests = roomGuestTimer[0][0] + roomGuestTimer[1][0] + roomGuestTimer[2][0] + roomGuestTimer[3][0] + roomGuestTimer[4][0] + roomGuestTimer[5][0];
   client.publish("doorHub/GuestCount", String(guests).c_str(), true);
   reset();
 }
 
+//Skriver antallet beboere i Node Red dashboard
 void residentCount() {
   client.publish("doorHub/ResidentCount", String(residents).c_str(), true);
   reset();
 }
 
+//Funksjon som looper når en gjest har ringt på døra og venter på svar
 void guestWaiting() {
   while (guestWait) {
     digitalWrite(yellowLED, HIGH);
@@ -354,12 +362,11 @@ void guestWaiting() {
   }
 }
 
+//Tilkalles når ESP32 mister tilkobling til klienten
 void reconnect() {
-  // Loop until we're reconnected
   Serial.println("In reconnect...");
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
     if (client.connect("doorHub")) {
       Serial.println("connected");
       client.subscribe("doorHub/RoomAccept");
