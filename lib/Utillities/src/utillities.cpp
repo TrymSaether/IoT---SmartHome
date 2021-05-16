@@ -1,78 +1,121 @@
+// bibliotek
 #include <Arduino.h>
 #include <ESP32servo.h>
-#include "time.h"
 #include "Utillities.h"
 
+
 // Variabler
-// ----- Funksjoner ------
-int distanceSensor(){
-    float duration, distance;          // tid og lengde (cm)
-    duration = pulseIn(echoPin, HIGH); // Leser signalet fra sensoren
-    // konverterer tid til distanse.
-    distance = (duration / 2) / 29.1; // Regner ut distansen...
-    return (distance);
+#define CORONADISTANCE 2     // Anbefalt 2m avstand fra FHI.
+#define CURTAININTERVAL 2000 // Tiden for at gardin går opp/ned.
+#define CURTAINPOWER 30      // styrken på gardin DC-motor for å få riktig styrke ifht gardinintervall
+
+// --------- Funksjoner ------------
+// mapper en bestemt lengde fra 0 - length
+int mapStandard(int nmval, int length)
+{
+    int val = map(nmval, 0, length, 0, 4095);
+    return (val);
 }
 
-void ceilingState(int ceilingSpeed)
+// Distansensor
+float distanceSensor()
 {
-    if (ceilingSpeed > 2)
+    float duration, distance;           // tid og lengde (cm)
+    duration = pulseIn(echoPin, HIGH);  // Leser signalet fra sensoren
+    distance = ((duration / 2) / 29.1); // Regner ut distansen...
+    return (distance / 10);
+}
+
+// Tak/vanlig vifte hastighet
+void ceilingFan(int subVal) // subscribe inn
+{
+    if (subVal > 0) // Over null
     {
-        digitalWrite(ceilPin1, LOW);
-        digitalWrite(ceilPin2, HIGH);
-        analogWrite(ceilPinEN1, ceilingSpeed);
+        digitalWrite(enable1Pin, LOW);
+        digitalWrite(enable2Pin, HIGH);
+        analogWrite(ceilingFanPin, subVal);
     }
     else
     {
-        digitalWrite(ceilPin1, LOW);
-        digitalWrite(ceilPin2, LOW);
-        analogWrite(ceilPinEN1, 0);
+        digitalWrite(enable1Pin, LOW);
+        digitalWrite(enable2Pin, LOW);
+        analogWrite(ceilingFanPin, LOW);
     }
 }
 
-bool curtainState(bool motorState)
+// Gardin opp/ned fra dashboard
+void curtainState(bool subVal)
 {
-    const int curtainInterval = 2000;
     long now = millis();
-    if (millis() < now + curtainInterval)
+    while (millis() < now + CURTAININTERVAL)
     {
-        digitalWrite(curtPin1, motorState);
-        digitalWrite(curtPin2, !motorState);
-        analogWrite(curtEN1, 30);
-        motorState = !motorState;
-        return(motorState);
+        analogWrite(curtainPin, CURTAINPOWER);
+        now = millis();
+        if (subVal)
+        { // OPP
+            digitalWrite(enable1Pin, subVal);
+            digitalWrite(enable2Pin, !subVal);
+        }
+        else if (!subVal)
+        { // NED
+            digitalWrite(enable1Pin, !subVal);
+            digitalWrite(enable2Pin, subVal);
+        }
+        else
+        { // Debug
+            Serial.print("Error -> Curtains");
+        }
+        // default, setter pin til lav.
+        digitalWrite(enable1Pin, LOW);
+        digitalWrite(enable2Pin, LOW);
+    }
+}
+
+void lightStates(String msgTemp)
+{
+    // Lys med smartfunksjon
+    if(msgTemp == "smart")
+    {
+        short int ldrSensor = map(analogRead(ldrPin),0,4095,4095,0); // Leser fotoresistor
+        analogWrite(ledBPin,ldrSensor); // skriver den ut til lyset slik at den dimmes motsatt med den.
+    }
+    else if(msgTemp == "true")
+    {
+      digitalWrite(ledBPin, HIGH);
+    }
+    else if(msgTemp == "false"){
+      digitalWrite(ledBPin, HIGH);
+    }
+}
+
+void heaterState(int subVal, int roomTemp) // OBS GJØRGJØR!
+{
+    if (subVal > 0 && subVal <= roomTemp)
+    {
+        digitalWrite(heaterPin, HIGH);
     }
     else
     {
-        digitalWrite(curtPin1, LOW);
-        digitalWrite(curtPin2, LOW);
-        analogWrite(curtEN1, 0);
-        return(0);
+        digitalWrite(heaterPin, LOW);
     }
 }
 
-void lightStates(int ledSlider)
+// Tester om noen er nærmere enn 2 meter, i henhold til Koronareglene.
+bool coronaCheckDistance(int distanceNow)
 {
-    if (ledSlider > 0)
+    if (distanceNow < CORONADISTANCE)
     {
-        analogWrite(ledPin, ledSlider);
+        digitalWrite(ledRPin, HIGH);
+        return (true);
+    }
+    else
+    {
+        digitalWrite(ledRPin, LOW);
+        return (false);
     }
 }
 
-void heatertempState(int roomTemp) // OBS GJØRGJØR!
-{
-
-}
-
-void coronaDistanceChecker(int distanceNow){
-  const int coronaDistance = 200;
-    if(distanceNow<coronaDistance){
-      digitalWrite(ledPin,HIGH);
-    }
-    else if(distanceNow>coronaDistance){
-      digitalWrite(ledPin, LOW);
-    }
-}
 void callback()
 {
-    //placeholder callback function
+    //placeholder callback funksjon
 }

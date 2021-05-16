@@ -5,37 +5,35 @@
 // Pins, for å forenkle bruken av de i funksjoner
 enum Pins
 {
-    ledPin = 15, // ref ledpin (Rød) 
-    ledRPin = 15,
-    ledGPin = 2,
-    ledBPin = 0,
+    // ----- WRITE ------
+    ledPin = 4, // referanse pinne ved fravær av RGB-led. 
+    ledRPin = 4,
+    ledGPin = 16,
+    ledBPin = 17, 
     heaterPin = 60,
-    buttonPin1 = 18,
-    buttonPin2 = 19,
-    ceilPin1 = 48,
-    ceilPin2 = 49,
-    ceilPinEN1 = 50,
-    curtPin1 = 51,
-    curtPin2 = 52,
-    curtEN1 = 53,
-    solarPanPin = 4,
+    ceilingFanPin = 48,
+    curtainPin = 51,
+    enable1Pin = 51, // Bruker samme enablePin på begge DC motorene
+    enable2Pin = 53,
+    servoPin = 15, 
     // ---- READ -----
-    // * Sensorer
-    ldrPin = 32,
-    magPin = 35,
-    dhtPin = 33,
-    trigPin = 14,
-    echoPin = 27
-    
+    button1Pin = 19,
+    button2Pin = 19,
+    ldrPin = 32, // Lightdependent resistor pin
+    magnetHallPin = 35, // Magnetisk halleffekt pin
+    dhtPin = 33,  // temp, luftfuktighetpin
+    trigPin = 14, // Ultrasonic beam sensor: 
+    echoPin = 27 //sender og mottaker pin for
 };
 
-
-void curtainState(int buttonState);
-int distanceSensor();
-void ceilingState(int ceilingSpeed);
-void lightStates(int ledSlider);
-void heatertempState(int roomTemp);
-void callback();
-void callbackSub(char *topic, byte *message, unsigned int length);
 void reconnect();
-void coronaDistanceChecker(int distanceNow);
+void callback();
+void callbackMQTT(char *topic, byte *message, unsigned int length);
+void curtainState(bool subVal);
+void ceilingFan(int subVal);
+void lightStates(String ldrTemp);
+void heaterState(int subVal, int roomTemp);
+bool coronaCheckDistance(int distance);
+int mapStandard(int val, int length); 
+int dcControl(int subVal, Pins p);
+float distanceSensor();

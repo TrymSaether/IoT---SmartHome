@@ -1,5 +1,5 @@
-
+// Bibliotek for printing av diverse
 void printLocalTime();
-void printSensorData(float h, float t, float p, float cd, float l);
+void printData(float h, float t, float p, float cd, float l);
 void print_wakeup_reason();
 void print_wakeup_touchpad();

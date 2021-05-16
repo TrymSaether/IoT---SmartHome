@@ -1,133 +1,199 @@
-// Bibliotek
 #include <Arduino.h>
 #include <WiFi.h>
 #include "PubSubClient.h"
 #include "time.h"
 #include "Utillities.h"
 #include "DHT.h"
-#include "SolarAngle.h"
 #include "Power.h"
 #include "Print.h"
+#include "Matrix.h"
 
-// ----- Definerte variabler" -----
-#define Threshold 40 // Toleranse for touchpinoppvåkning.
-#define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  300        /* Time ESP32 will go to sleep (in seconds) */
-// ----- Variabler ------
-// Wifi:
-const char *ssid =  "Trym sin iPhone"; // "Telenor9381sky";
-const char *password = "eplepai1"; //"xtpevmzjukkwq";
-const char *mqtt_server = "172.20.10.5"; // "10.0.0.66";// MQTT signalbehandling
-const char ID[] = "Trym";
-WiFiClient espClient; // Esp wifioppkobling
-PubSubClient client(espClient); // klient for sending av esp32 mqtt signal til RPi
+/* | KODE, NAVN & VARIABELSTIL |
+1. Alle definerte variabler er i capslock
+2. variabelnavn er skrevet i CAMELCASE notasjon.
+3. 
+*/
 
-// Tid:
-const char *ntpServer = "pool.ntp.org"; // henter tid - nå i div format.
-const long gmtOffset_sec = 3600; 
+// ----- Variabler -----
+// Definert:
+#define TOUCH_THRESHOLD 300 // Toleranse for touchpinoppvåkning.
+#define S_FACTOR 1000000    // micro til sekund
+#define TIME_TO_SLEEP 300   // Tid i sek ved oppvåkningssjekk.
+// -- Konstanter --
+// * WiFi/MQTT
+const char *ssid = "Trym sin iPhone";    // "Telenor9381sky";
+const char *password = "eplepai1";       //"xtpevmzjukkwq";
+const char *mqtt_server = "172.20.10.5"; // "10.0.0.66";// Node-RED server
+const char *iD = "Trym";                 // BrukerID
+
+WiFiClient espClient;           // Esp wifioppkobling
+PubSubClient client(espClient); // klient for sending av esp32 mqtt signal til RP.
+
+// -- Tid --
+const char *ntpServer = "pool.ntp.org"; // henter tid i div format.
+const long gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
 const int delayInterval = 5000; // delayintervall 5sek.
 
-// Diverse
-long lastMsg = 0; // Midlertidig variabel for "delay"
-float applianceStates[6] = {1.2, 0.6, 0.25, 0.1, 0, 1.1}; // Array for strømforbruk; 0: kjøkken, 1: bad, 2: stue, 3: soverom, 4: Solcelle 5: Passiv elementer
-bool buttonState; // Fysisk pullupknapp
-signed int sensorTemp;
-const int degreeAdjRoof = 20;
-RTC_DATA_ATTR int bootCount = 0; // antall ganger booted opp.
-DHT dht(dhtPin, DHT11); // Temp og luftfuktighet. sensor.
-Servo solarPanelAngle; // Servo til solcellepanel.
+// -- Diverse --
+// pullupknapper
+bool button1State;
+bool button2State;
+DHT dht(dhtPin, DHT11);          // Temp og luftfuktighet. sensor.
+RTC_DATA_ATTR int bootCount = 0; // Debug bootcount, lagrer det på et spesifikt minne.
 
-// ----------- SETUP -------------
+// -- tempvariabler --
+long lastMsg = 0; // temp for delay, vil bottlenecke etter 60 dager.
+short int ldrTemp;
+short int roomTemp;
+short int heaterTemp;
+short int azimuthTemp;
+short int ceilingTemp;
+
+// ---- Egendefinerte klasser ----
+// - Power -
+// Passive komponenter i hovedrom
+Power total{"Sum", 1};
+Power kitchen{"Pas", 2.2};
+Power livingRoom{"Pas", 1.1};
+Power bedrooms{"Pas", 6 * 0.4};
+Power hallway{"Pas", 4.3};
+Power bathroom{"Pas", 33.5};
+Power ovn{"Ovn", 1.9};
+Power solpow{"sp", -14.2};
+
+// - Solar -
+Solar solar{&solpow};
+// - Matrix -
+int kol = 5;
+int rad = 7;
+Matrix kollektiv{kol, rad};
+
+// ------------------------------------------------------  SETUP --------------------------------------------------------
 void setup()
 {
-  // pinModes.
-  pinMode(ledPin, OUTPUT);
+
+  Serial.begin(115200);
+  dht.begin();
+  WiFi.begin(ssid, password);
+  solar.panel.attach(servoPin);
+  // - pinModes -
+
+  pinMode(button2Pin, INPUT_PULLUP);
+  pinMode(magnetHallPin, INPUT);
+  pinMode(ldrPin, INPUT);
+  pinMode(ledRPin, OUTPUT);
   pinMode(ledGPin, OUTPUT);
   pinMode(ledBPin, OUTPUT);
-  pinMode(buttonPin1, INPUT);
-  pinMode(buttonPin2, INPUT);
-  pinMode(magPin, INPUT);
-  pinMode(ldrPin, INPUT);
-  Serial.begin(115200); // Seriemonitor
-  dht.begin(); // sensorer
+  pinMode(button1Pin, INPUT_PULLDOWN);
 
-  solarPanelAngle.attach(solarPanPin); // solcellepanelservo.
-  ++bootCount; // Debugging
+
+  ++bootCount;
   Serial.println("Boot number: " + String(bootCount));
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);           // WiFi tilkobling.
-  while (WiFi.status() != WL_CONNECTED) // Wifi statussjekk/feilmeldinger
+  while (WiFi.status() != WL_CONNECTED) // Wifi statussjekk/feil
   {
     delay(500);
     Serial.print(".");
   }
+
   Serial.println("WiFi connected.");
   Serial.println(WiFi.localIP());
   client.setServer(mqtt_server, 1883); // MQTT broker
-  client.setCallback(callbackSub); // Callback funksjon for signalbehandling MQTT.
+  client.setCallback(callbackMQTT);    // Callback funksjon for signalbehandling MQTT.
+
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Justering av tid, for +gmt og sommertid.
-  printLocalTime();  // Printer tid nå.
-  // Interuptfunksjoner.
-  // touchAttachInterrupt(GPIO_NUM_1, callback, Threshold); // esp våkner når gpio1 berøres. threshold satt til touchRead(2) testet verdi.
-  
+  printLocalTime();
+  touchAttachInterrupt(GPIO_NUM_1, callback, TOUCH_THRESHOLD); // Interupt: esp våkner når gpio1 berøres.
 }
+// ------------------------------------------------------  LOOP ---------------------------------------------------------
 void loop()
 {
-  //  -- Test Wifi --
-  if (!client.connected())
+  randomSeed(analogRead(0));
+  if (!client.connected()) // * WiFi og MQTT
   {
-    reconnect(); // Prøver på nytt.
+    reconnect();
   }
-  client.loop(); // Looper mqtt brokeren/en måte for å starte callbackfunksjonen.
-  // --- homeHub ---
-  buttonState = digitalRead(buttonPin1); // Leser knapp for booking av dass.
+  client.loop(); // Initialiserer Callback
+  // ----------------- homeHub -------------------
+  button1State = digitalRead(button1Pin); // Leser knapp for booking av bad.
+  Serial.println("Hallo");
+  Serial.println(button1State);
+  kollektiv.print();
+  // button2State = digitalRead(button2Pin);
+
+  // ----------- Intervall ------------
   unsigned long now = millis();
-  if (now - lastMsg > delayInterval) // delay  
+  if (now - lastMsg > delayInterval)
   {
     lastMsg = now;
-    // * Sensorverdier
-    float h = dht.readHumidity(); // Fuktighet
-    float t = dht.readTemperature(); // Temperatur
-    float l = analogRead(ldrPin);
-    float cd = distanceSensor(); // Koronadistanse
-    float m = digitalRead(magPin);
-    Serial.print("Magnetsensor: ");
-    Serial.println(m);
-    // * Beregner totalt energiforbruk
-    float p = powerContribution(applianceStates, 1); 
-    printSensorData(h,t,p,cd,l); // Printfunksjon
-    // coronaDistanceChecker(cd); // Distansefunksjon
-    // * Omgjør sensor/forbruk int, float -> "string/chars"
-    char ldrString[8];
-    char tempString[8];
-    char humString[8];
-    char powString[8];
-    char solarpowString[8];
-    dtostrf(t, 1, 2, tempString);
-    dtostrf(h, 1, 2, humString);
-    dtostrf(p, 1, 2, powString);
-    dtostrf(l, 1, 2, ldrString);
-    dtostrf(applianceStates[5],1,2,solarpowString);
-    // * Sender data til Node Red topics
-    client.publish("homeHub/sensors/temperature", tempString);
-    client.publish("homeHub/sensors/humidity", humString);
-    client.publish("homeHub/power/currentpower", powString);
-    //client.publish("homeHub/power/solarpower",solarpowString);
-    client.publish("homeHub/sensors/lightsensor",ldrString);
-    // * Booker toalett i xSekund med knapp.
-    if(buttonState == true)
+
+    //n-----Test-- ----total.setPrice(8);
+    float foo1 = solpow.getkW();
+    float bar1 = kitchen.getkW();
+    int foo2 = total.pYear();
+    float foo3 = total.getSum();
+
+    Serial.println(foo1);
+    Serial.println(foo2);
+    Serial.println(bar1);
+    Serial.println(foo3);
+
+    float pw = total.getSum(); // Beregner totalt energiforbruk
+    int prc = total.getkW();
+
+   
+
+    
+    // --- Sensorer ---
+    float h = dht.readHumidity();              // Fuktighet
+    float t = dht.readTemperature();           // Temperatur
+    float ldr = analogRead(ldrPin);            // LDR - light dependant resistor
+    float cd = distanceSensor();               // Koronadistanse
+    short int mg = digitalRead(magnetHallPin); // Mapper magnethallsensoren
+
+    // Klargjør home/sunHubdata til å sendes til hovedenhet
+    char hStr[8];
+    char tStr[8];
+    char ldrStr[8];
+    char cdStr[8];
+    char pwStr[8];
+    char prcStr[8];
+    char mgStr[3];
+
+    // float/double to const char* / "String"
+    dtostrf(h, 2, 1, hStr);
+    dtostrf(t, 2, 1, tStr);
+    dtostrf(ldr, 4, 1, ldrStr);
+    dtostrf(mg, 4, 0, mgStr);
+    dtostrf(prc, 5, 1, prcStr);
+    dtostrf(pw, 3, 1, pwStr);
+    dtostrf(cd,2,1,cdStr);
+
+    // ---- Publish Node-RED ----
+    client.publish("homeHub/sensors/temperature", tStr);
+    client.publish("homeHub/sensors/humidity", hStr);
+    client.publish("homeHub/sensors/lightsensor", ldrStr);
+    client.publish("homeHub/sensors/distance", cdStr);
+    client.publish("homeHub/power/watt", pwStr);
+    client.publish("homeHub/power/price", prcStr);
+
+    // printData(h,t,pw,cd,ldr); // Printfunksjon
+    // coronaCheckDistance(cd); // Distansefunksjon
+    // Booker toalett i xSekund med knapp.
+    // ---- Betingelser ----
+    if (button1State)
     {
       client.publish("homeHub/booking/bathroom", "booked");
-      client.publish("homeHub/booking/ID", ID); // Sender ID på hvem som booker
+      client.publish("homeHub/booking/ID", iD); // Sender ID på hvem som booker
       Serial.println("Bathroom is booked by: ");
-      Serial.print(ID);
+      Serial.print(iD);
+      // Power bathroom{"inUse", 1.2};
     }
   }
 }
-
-
+// ---- Subscribe ----
 // MQTT-temaer og wifitilkobling ved avbrudd.
 void reconnect()
 {
@@ -137,9 +203,9 @@ void reconnect()
     if (client.connect("ESP8266Client"))
     {
       Serial.println("connected");
-      // Subscribe
+
       client.subscribe("homeHub/sensors/");
-      client.subscribe("homeHub/booking/bathroom1");
+      client.subscribe("homeHub/booking/bathroom");
       client.subscribe("homeHub/room/light");
       client.subscribe("homeHub/room/ceilingspeed");
       client.subscribe("homeHub/room/heater");
@@ -147,7 +213,7 @@ void reconnect()
       client.subscribe("homeHub/power/sleep");
     }
     else
-    {// Looper 
+    { // ved feil.
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
@@ -155,18 +221,16 @@ void reconnect()
     }
   }
 }
-
-// --- Callback ---
 /*
+------- Callback --------
 peker til topic i N.R(les: Node Red), som leser meldingen fra hvert topic 
 som en String og bestemmer hvilke funksjoner/funksjonalitet de skal ha. F.eks. 
-ved knappetrykk på "webserveren"/API til kollektivet skal utføre X operasjon på/i ESP32.
-*/
-void callbackSub(char *topic, byte *message, unsigned int length)
+ved knappetrykk på "webserveren"/API til kollektivet skal utføre X operasjon på/i ESP32. */
+void callbackMQTT(char *topic, byte *message, unsigned int length)
 {
-  // * Printer i seriemonitor 
+  // * Printer i seriemonitor
   Serial.print("Message arrived on topic: ");
-  Serial.print(topic);// topic fra N.R når beskjed kommer.
+  Serial.print(topic); // topic fra N.R når beskjed kommer.
   Serial.print(". Message: ");
   String messageTemp;
   for (int i = 0; i < length; i++) // Selve beskjeden fra gjeldende topic
@@ -174,136 +238,118 @@ void callbackSub(char *topic, byte *message, unsigned int length)
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
   }
-  Serial.println();
-
-  // ---- NODE RED FUNKSJONER ----
-  /* --- Strømforbruk ---
-  De aller fleste funksjoner som skrur på komponenter eller funksjonaliter 
-  som "bruker" strøm vil øke verdien til det gitt rommet og komponenten i 
-  ett array "applianceStates[x]" gitt i kw.
-    - Booking kjøkken - 
-  Setter lys til blått når noen har booket og bruker kjøkken.
-  */
-  if (String(topic) == "homeHub/booking/kitchen") 
+  // ------- MQTT -> Node-RED --------
+  // --- Booking ---
+  // - kjøkken -
+  //booker kjøkken nå, etter lys til blått når noen har booket og bruker kjøkken.
+  if (!strcmp(topic, "homeHub/booking/kitchen"))
   {
-    Serial.print("Changing output to ");
+    Serial.print("\nChanging output to ");
     if (messageTemp == "true")
     {
-      Serial.println("true");
+      Serial.println("booked");
       digitalWrite(ledBPin, HIGH);
-      applianceStates[0] += 4.0;
+      Power kitchen1{"Ovn", 1.};
+      Power kitchen2{"mikro", 0.9};
     }
     else if (messageTemp == "false")
     {
-      Serial.println("false");
+      Serial.println("available");
       digitalWrite(ledBPin, LOW);
     }
   }
   // - Booking bad -
   // * Setter lys til rødt når noen har booket og bruker badet.
-  else if (String(topic) == "homeHub/booking/bathroom1")
+  else if (!strcmp(topic, "homeHub/booking/bathroom"))
   {
-    Serial.print("Changing output to ");
+    Serial.print("Bathroom: ");
+    digitalWrite(ledBPin, LOW);
     if (messageTemp == "booked")
     {
-      digitalWrite(ledRPin, HIGH);
-      applianceStates[1] = 2.8; // Forbruk aktivt bad
+      digitalWrite(ledRPin, HIGH); // Rødt for booket
     }
     else if (messageTemp == "available")
     {
-      client.publish("homeHub/booking/ID", "Available"); // Sender at er bad ledig
-      digitalWrite(ledRPin, LOW); 
-      digitalWrite(ledGPin, HIGH); 
-      digitalWrite(ledBPin, LOW); 
+      client.publish("homeHub/booking/ID", "Available"); // Bad ledig
+      digitalWrite(ledRPin, LOW);
+      digitalWrite(ledGPin, HIGH); // Grønt lys for ledig
     }
   }
-  // - Booking stue -
-  else if (String(topic) == "homeHub/booking/livingroom")
+  // - stue -
+  // * Setter lys til rødt når noen har booket og bruker kjøkkeneet.
+  else if (!strcmp(topic, "homeHub/booking/livingroom"))
   {
+    Serial.print("Living Room: ");
     if (messageTemp == "booked")
     {
-      applianceStates[2] = 1.85; // Forbrukt aktiv stue
+      Serial.println("Booked");
     }
     else if (messageTemp == "available")
     {
-      applianceStates[2] = 0.30;
+      Serial.println("Available");
     }
   }
-  else if (String(topic) == "homeHub/room/heater"){
-    int heaterSettings = messageTemp.toInt();
-    int t1 = dht.readTemperature(); // temperatursjekk rom
-    bool hsState = true;
-    if(heaterSettings > t1 && hsState){
-      // digitalWrite(heaterPin, LOW);
-      applianceStates[3] -= heaterSettings/20;
-      hsState = false;
-    }
-    else if(heaterSettings < t1 && hsState != true){
-      // analogWrite(heaterPin, heaterSettings);
-      applianceStates[3] += heaterSettings/20;
-      hsState = true;
-    }
-  }
-  else if (String(topic) == "homeHub/room/ceilingspeed")
+  else if (!strcmp(topic, "homeHub/bedroom/heater"))
   {
-    bool csState = true;
-    int csTemp = messageTemp.toInt();
-    if(csTemp == 0 && csState){
-      applianceStates[3] -= 0.2;
-      csState = false;
-    }
-    else if(csTemp>0 && csState != true){
-      applianceStates[3] += 0.2;
-      csState = true;
-    }
+    heaterTemp = messageTemp.toInt();
+    roomTemp = dht.readTemperature();
+    heaterState(heaterTemp, roomTemp);
   }
-   else if (String(topic) == "homeHub/sensors/lightsensor")
+  else if (!strcmp(topic, "homeHub/bedroom/ceilingFan"))
   {
-    sensorTemp = messageTemp.toInt();
+    ceilingTemp = messageTemp.toInt();
+    ceilingFan(ceilingTemp);
   }
-   else if (String(topic) == "homeHub/room/light")
+  else if (!strcmp(topic, "homeHub/bedroom/light"))
   {
+
     if (messageTemp == "true")
     {
-      analogWrite(ledBPin, sensorTemp);
-      applianceStates[3] += 0.015;
+      analogWrite(ledBPin, ldrTemp);
     }
     else if (messageTemp == "false")
     {
       digitalWrite(ledBPin, LOW);
-      applianceStates[3] -= 0.15;
     }
-    else if(messageTemp == "trueon"){
+    else if (messageTemp == "trueon")
+    {
       digitalWrite(ledBPin, HIGH);
-      applianceStates[3] += 0.15;
     }
   }
-  else if (String(topic) == "homeHub/power/azimuth")
+  else if (!strcmp(topic, "sunHub/azimuth"))
   {
-    int azimuthAdj = messageTemp.toInt() - degreeAdjRoof;
-    Serial.print("Azimuth Angle: ");
-    Serial.println(azimuthAdj);
-    if(azimuthAdj<=180 && azimuthAdj>=0){
-      solarPanelAngle.write(azimuthAdj); // vinkel for solcellepanel, justert med 20 grader
-      applianceStates[5] = -10.0;
-      char solarpower[8];
-      dtostrf(abs(applianceStates[5]),3,1,solarpower);
-      client.publish("homeHub/power/solarpower",solarpower);
-    }
-    else{
-      applianceStates[5] = 0;
-    }
+
+    char spwStr[8];
+    azimuthTemp = messageTemp.toInt();
+    client.publish("sunHub/watt", dtostrf(abs(solpow.getkW()), 3, 1, spwStr));
+    solar.setAngle(azimuthTemp);
+    solar.solarWrite();
+    solar.solarPrint();
   }
-  else if (String(topic) == "homeHub/power/sleep")
+  else if (!strcmp(topic, "homeHub/sleep")) // Legger ESP32 i hvilemodus, kun to RTC prosess (tid) som kjører
   {
     if (messageTemp == "true")
     {
-      esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR); // sjekker hvert 5 min om away er
+      esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * S_FACTOR); // sjekker hvert 5 min om away er
       esp_deep_sleep_start();
     }
-    else if(messageTemp == "false"){
+    else if (messageTemp == "false")
+    {
       print_wakeup_reason();
       print_wakeup_touchpad();
+    }
+  }
+}
+
+void randomMatrix(Matrix mx)
+{
+  int num;
+  for (int i = 0; i < mx.getRows(); i++)
+  {
+    for (int j = 0; j < mx.getColumns(); j++)
+    {
+      num = random(40);
+      mx.set(i, j, num);
     }
   }
 }

@@ -13,7 +13,7 @@ void printLocalTime()
     Serial.println(&timeinfo, "%d.%m.%y-%H:%M:%S");
 }
 
-void printSensorData(float h, float t, float p, float cd, float l)
+void printData(float h, float t, float p, float cd, float l)
 {
     Serial.print("Temperature: ");
     Serial.println(t);
