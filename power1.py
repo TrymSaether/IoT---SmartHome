@@ -25,18 +25,18 @@ def on_message(client, userdata, msg): # for å mota meldinger
     
     if msg.topic == "homeHub/booking/kitchen":  # for motatt melding
         if(msg.payload == 'true'):
-            power_consumption = 6.0 #strømforbruk i min
+            power_consumption = 0.103 #strømforbruk i min
             power(msg.topic, power_consumption) #funksjon for lagring av strøm
         elif(msg.payload == 'false'):
-            power_consumption = 0.5
+            power_consumption = 0.0083
             power(msg.topic, power_consumption)
             
     if msg.topic == "homeHub/booking/bathroom1":  
         if(msg.payload == 'available'):
-            power_consumption = 0.5
+            power_consumption = 0.0083
             power(msg.topic, power_consumption)
         elif(msg.payload == "booked"):
-            power_consumption = 6.2
+            power_consumption = 0.103
             power(msg.topic, power_consumption)
             print(new_power)
             
@@ -45,12 +45,12 @@ def on_message(client, userdata, msg): # for å mota meldinger
             power_consumption = 0.0
             power(msg.topic, power_consumption)
         elif(msg.payload == "booked"):
-            power_consumption = 28
+            power_consumption = 0.103
             power(msg.topic, power_consumption)
             
     if msg.topic == "homeHub/room/ceilingspeed":  
         if(msg.payload == ""):
-            power_consumption = 0.4
+            power_consumption = 0.0064
             power(msg.topic, power_consumption)
         elif(msg.payload == ""):
             power_consumption = 0.0
@@ -58,19 +58,19 @@ def on_message(client, userdata, msg): # for å mota meldinger
             
     if msg.topic == "homeHub/room/light":  
         if(msg.payload == 'true'):
-            power_consumption = 0.1
+            power_consumption = 0.002
             power(msg.topic, power_consumption)
         elif(msg.payload == 'false'):
-            power_consumption = 0.1
+            power_consumption = 0.0
             power(msg.topic, power_consumption)
         elif(msg.payload == 'trueon'):
-            power_consumption = 0.1
+            power_consumption = 0.002
             power(msg.topic, power_consumption)
             
     if msg.topic == "homeHub/power/azimuth":  #usikker på hvordan den fungerer
         azimuthAdj = (int(msg.payload) - 20)
         if(azimuthAdj <= 180 or azimuthAdj >= 0):
-            power_consumption = -10
+            power_consumption = -0.166
             power(msg.topic, power_consumption)
     if msg.topic == "homeHub/power/consumption":  
         
