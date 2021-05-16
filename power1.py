@@ -81,7 +81,7 @@ def power(topic, usage): # lagring av forbruk som er akkurat nå
     new_power = pd.read_csv("power.csv") #leser csv fil
     new_power.at[0, topic] = usage #legger inn ny verdi i rett felt for rett topic
     time.sleep(1)
-    new_power.to_csv("power1.csv", index=False) # lagrer endringer
+    new_power.to_csv("power.csv", index=False) # lagrer endringer
     print(new_power)
     
 
